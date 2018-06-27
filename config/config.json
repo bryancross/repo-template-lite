@@ -1,0 +1,27 @@
+{
+  "global": {
+    "adminUsername": "admackbar",
+    "authType": "oauth",
+    "TemplateSourceHost": "octodemo.com",
+    "TemplateSourceRepo": "rebelware/repo-template",
+    "TemplateSourcePath": "config/repo_templates",
+    "TemplateSourceBranch": "master",
+    "repoDescriptionSuffix": " -- Created by repo-template",
+    "commitMsg": "committed by repo-template",
+    "callbackURL": "https://c197aff2.ngrok.io/",
+    "userAgent": "repo-template",
+    "callback": "",
+    "jobsLimit": 1000,
+    "githubAPIDebug": false,
+    "repoRequestHost": "octodemo.com",
+    "repoRequestRepo": "rebelware/repoRequests",
+    "repoRequestBranch": "master",
+    "repoRequestPath": "/requests",
+    "repoRequestPRLabels": [
+      "Repo Request"
+    ],
+    "repoRequestPRAssignees": [
+      "admackbar"
+    ]
+  }
+}
