@@ -46,8 +46,6 @@ RepoTemplate.prototype.init = function () {
     this.suspended = true;
     this.config = {};
     this.workers = new HashMap();
-	}
-
 };
 
 RepoTemplate.prototype.initHTTPServer = function(){
@@ -137,23 +135,26 @@ RepoTemplate.prototype.handleInit = function(req,res)
     var PAT = req.headers.auth;
     var regex = /^([a-z|0-9]){40}$/;
     var msg = '';
-    var config = {}''
+    var config;
 
     if (typeof PAT == 'undefined' || !regex.test(PAT))
     {
-
-        msg = "Authentication failed: Missing or invalid PAT";
-    	res.respond(401, msg, "Missing or invalid PAT");
+    	res.respond(401, "Authentication failed: Missing or invalid PAT", "Missing or invalid PAT");
         return;
     }
 
     try{
-    	config = JSON.parse(req.body.config)
+    	config = JSON.parse(req.body)
+		if(typeof config == 'undefined')
+		{
+			req.respond(401,"Missing config");
+			return;
+		}
 		req.rt.loadConfig(config);
 	}
 	catch(err)
 	{
-        res.respond(401, msg, "Could not parse config");
+        res.respond(401, "Invalid or missing config", "Could not parse config");
         return;
 	}
 
@@ -452,7 +453,6 @@ RepoTemplate.prototype.loadRepoConfigs = function (req) {
 
 RepoTemplate.prototype.loadConfig = function (newConfig)
 {
-    let newConfig = {};
     let origRepoConfigs = new HashMap();
 
     if (this.config && Object.prototype.hasOwnProperty.call(this.config, 'repoConfigs')) {

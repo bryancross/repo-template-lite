@@ -4,11 +4,9 @@
  */
 
 'use strict';
-const requestJson = require('request-json');
 const HashMap = require('hashmap');
 const fs = require('fs');
 const crypto = require('crypto');
-const differenceInMilliseconds = require('date-fns/difference_in_milliseconds'); // https://github.com/date-fns/date-fns
 const format = require('date-fns/format');  // https://github.com/date-fns/date-fns
 const parse = require('date-fns/parse');  // https://github.com/date-fns/date-fns
 const GitHubClient = require('github'); // https://github.com/mikedeboer/node-github
@@ -526,7 +524,7 @@ Worker.prototype.createIssue = function () {
         owner: this.config.params.newRepoOwner,
         repo: this.config.params.newRepoName,
         title: 'Your repository created by repo-template',
-        body: 'Your repo-template jobID: ' + this.ID + '.\r\n Check [here](' + this.config.global.callbackURL + 'status?jobID=' + this.ID + '&format=html) for status info.\r\ncc/ @' + this.config.params.newRepoRequester
+        body: 'Your repo-template jobID: ' + this.ID + '\r\ncc/ @' + this.config.params.newRepoRequester
     }).then(issue => {
         self.controllerCallback('createIssue', true, issue);
     }).catch(err => {
@@ -672,7 +670,8 @@ Worker.prototype.createPR = function () {
         title: 'Repository creation request: ' + this.config.params.newRepoName,
         head: this.runtimeData.requestBranch.split('/')[2],
         base: this.config.global.repoRequestBranch,
-        body: 'Repository creation request submitted via chat.  We could optionally include some text here as well from the requester.\n\n### REQUEST:\n\n```JSON  \n' + JSON.stringify(this.config.params).replace(/,/g, '\n,') + '\n```' + notes;
+        //body: 'Repository creation request submitted via chat.  We could optionally include some text here as well from the requester.\n\n### REQUEST:\n\nJSON  \n' + JSON.stringify(this.config.params).replace(/,/g, '\n,') + '\n```' + notes
+        body: 'Repository creation request submitted via chat.  We could optionally include some text here as well from the requester.\n\n### REQUEST:\n\n```JSON  \n' + JSON.stringify(this.config.params).replace(/,/g, '\n,') + '\n```' + notes
     }).then(result => {
         self.runtimeData.PR = result
         self.controllerCallback('createPR', true, result);
@@ -785,7 +784,7 @@ Worker.prototype.createPRComment = function (result) {
         owner: this.runtimeData.PR.repository.owner.login,
         repo: this.runtimeData.PR.repository.name,
         number: this.runtimeData.PR.number,
-        body: 'Your repo-template jobID: ' + this.ID + '.\r\n Check [here](' + this.config.global.callbackURL + 'status'  + '?jobID=' + this.ID + '&format=html) for status info.\r\n' + commentText
+        body: 'Your repo-template jobID: ' + this.ID + '.\r\n' + commentText
                 + (this.runtimeData.repository ? '\r\nClick [here](' + this.runtimeData.repository.html_url + ') to visit your new repository.\r\n\r\ncc: /@' + this.config.params.newRepoRequester : '')
     }).then(comment => {
         self.controllerCallback('createPRComment', true, comment);
