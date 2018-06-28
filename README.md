@@ -175,7 +175,7 @@ Create a file in the repository configured to serve such requests and include th
  
 2. Commit the file to a new branch
 3. Create a Pull Request against the branch configured for this purpose by the `repoRequestBranch` parameter in 
- `./config/config.json`
+ `./config/config-example.json`
 4. When the PR is merged, the webhook will send the configuration parameters to the /pullrequest endpoint.
 
 Once the repository is created, repo-template will create an issue with a link to the log file for the 
@@ -206,7 +206,7 @@ There are two application level configurations:
 
 ### Server Configuration
 
-Server configuration is stored in `./config/config.json`.  This file also serves
+Server configuration is stored in `./config/config-example.json`.  This file also serves
 as the template for the job logging mechanism.    
 
 NOTE: The user specified must currently be a site admin

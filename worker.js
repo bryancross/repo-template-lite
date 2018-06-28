@@ -9,7 +9,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const format = require('date-fns/format');  // https://github.com/date-fns/date-fns
 const parse = require('date-fns/parse');  // https://github.com/date-fns/date-fns
-const GitHubClient = require('github'); // https://github.com/mikedeboer/node-github
+const GitHubClient = require('@octokit/rest'); // https://github.com/mikedeboer/node-github
 var events = require('events');
 
 //let self;  //I spent most of a day figuring out that you only should initialize self in closures where you need it, lolz
@@ -57,11 +57,11 @@ Worker.prototype.getID = function() {
 };
 
 Worker.prototype.createPullRequest = function () {
-    this.pullRequestController('begin');
+    this.createPullRequestController('begin');
 };
 
-Worker.prototype.pullRequestController = function (step, status, result) {
-    this.controllerCallback = this.pullRequestController;
+Worker.prototype.createPullRequestController = function (step, status, result) {
+    this.controllerCallback = this.createPullRequestController;
     switch (step) {
         case 'begin':
             this.validateUser(this.config.params.newRepoRequester);
@@ -197,8 +197,8 @@ Worker.prototype.validateUserInOrg = function(username, orgname)
     this.github.orgs.getForUser({
         username: this.config.params.newRepoRequester
     }).then(function(result){
-        for(var i = 0;i < result.length;i++) {
-            if (result[i].login == self.config.params.newRepoOwner) {
+        for(var i = 0;i < result.data.length;i++) {
+            if (result.data[i].login == self.config.params.newRepoOwner) {
                 self.runtimeData.userInOrg = true;
                 self.controllerCallback("validateUserInOrg", true, result[i]);
                 return;
@@ -229,7 +229,7 @@ Worker.prototype.validateOrg = function(orgname){
     });
 };
 
-Worker.prototype.createRepoRequestPRController = function (step, status, result) {
+Worker.prototype.createRepositoryController = function (step, status, result) {
 
     switch (step) {
         case 'begin':
@@ -401,7 +401,8 @@ Worker.prototype.createBranches = function () {
                     repo: this.runtimeData.repository.name,
                     ref: 'refs/heads/' + this.runtimeData.repoConfig.branches[i].name,
                     sha: this.runtimeData.repoBranches.get('master').object.sha
-                }));
+
+               }));
         }
     }
     Promise.all(proms).then(result => {
@@ -419,7 +420,7 @@ Worker.prototype.getPRConfigFile = function () {
         path: this.runtimeData.paramsBLOB.filename,
         ref: this.config.global.repoRequestBranch
     }).then(result => {
-        self.config.params = JSON.parse(Buffer.from(result.content, 'base64').toString());
+        self.config.params = JSON.parse(Buffer.from(result.data.content, 'base64').toString());
         if (!self.config.repoConfigs.has(self.config.params.newRepoTemplate)) {
             throw new Error('No repository configuration with name ' + self.config.params.newRepoTemplate + ' found.');
         }
@@ -438,15 +439,15 @@ Worker.prototype.getPRCommit = function () {
         sha: this.runtimeData.PR.pull_request.merge_commit_sha,
         recursive: true
     }).then(result => {
-        if (result.files.length < 1) {
+        if (result.data.files.length < 1) {
             self.controllerCallback('getPRCommit',"Failure", new Error('Empty commit, no config file, nothing to do'));
-    } else if(result.files.length > 1)
+    } else if(result.data.files.length > 1)
     {
         self.controllerCallback('getPRCommit',"Failure", new Error('Multiple files in commit'));
     }
     else {
         // Assume there's only one file in the commit
-        self.runtimeData.paramsBLOB = result.files[0];
+        self.runtimeData.paramsBLOB = result.data.files[0];
         self.controllerCallback('getPRCommit', true, result);
     }
     }).catch(err => {
@@ -454,8 +455,8 @@ Worker.prototype.getPRCommit = function () {
     });
 };
 
-Worker.prototype.createRepositoryRequestPR = function () {
-    this.controllerCallback = this.createRepoRequestPRController;
+Worker.prototype.createRepository = function () {
+    this.controllerCallback = this.createRepositoryController;
     this.controllerCallback('begin');
 };
 
@@ -466,9 +467,9 @@ Worker.prototype.getTeamsForOrg = function () {
     this.runtimeData.orgTeams = new HashMap();
     Promise.all(proms)
         .then(result => {
-            if (result.length > 0) {
-                for (let i = 0; i < result[0].length; i++) {
-                    self.runtimeData.orgTeams.set(result[0][i].name, result[0][i]);
+            if (result.length > 0 && result[0].data.length > 0) {
+                for (let i = 0; i < result[0].data.length; i++) {
+                    self.runtimeData.orgTeams.set(result[0].data[i].name, result[0].data[i]);
                     };
                 self.controllerCallback('getTeamsForOrg', true, result);
             };
@@ -510,7 +511,7 @@ Worker.prototype.createRepo = function (repoConfig) {
     };
     this.github.repos.createForOrg(options)
         .then(newRepo => {
-            self.runtimeData.repository = newRepo;
+            self.runtimeData.repository = newRepo.data;
             self.controllerCallback('createRepo', true, newRepo);
             return;
         }).catch(err => {
@@ -539,8 +540,8 @@ Worker.prototype.getBranchesForRepo = function () {
         repo: this.config.params.newRepoName
     }).then(repoBranches => {
         self.runtimeData.repoBranches = new HashMap();
-        for (let i = 0; i < repoBranches.length; i++) {
-            self.runtimeData.repoBranches.set(repoBranches[i].ref.split('/').pop(), repoBranches[i]);
+        for (let i = 0; i < repoBranches.data.length; i++) {
+            self.runtimeData.repoBranches.set(repoBranches.data[i].ref.split('/').pop(), repoBranches.data[i]);
         }
 
         if (self.runtimeData.repoBranches.has('master')) {
@@ -548,7 +549,8 @@ Worker.prototype.getBranchesForRepo = function () {
             }
          self.controllerCallback('getBranchesForRepo', true, repoBranches);
     }).catch(err => {
-            self.controllerCallback('getBranchesForRepo', false, err);
+        err.message = err.message + 'getBranchesForRepo';
+        self.controllerCallback('getBranchesForRepo', false, err);
     });
 };
 
@@ -594,7 +596,7 @@ Worker.prototype.getMasterRef = function () {
         repo: this.config.global.repoRequestRepo.split('/', 2)[1],
         ref: 'heads/master'
     }).then(result => {
-        self.runtimeData.masterCommitSHA = result.object.sha;
+        self.runtimeData.masterCommitSHA = result.data.object.sha;
         self.runtimeData.requestBranch = 'refs/heads/' + self.config.params.newRepoRequester + '-' + self.config.params.newRepoName + '-' + self.ID;
         self.controllerCallback('getMasterRef', true, result);
     }).catch(err => {
@@ -673,7 +675,7 @@ Worker.prototype.createPR = function () {
         //body: 'Repository creation request submitted via chat.  We could optionally include some text here as well from the requester.\n\n### REQUEST:\n\nJSON  \n' + JSON.stringify(this.config.params).replace(/,/g, '\n,') + '\n```' + notes
         body: 'Repository creation request submitted via chat.  We could optionally include some text here as well from the requester.\n\n### REQUEST:\n\n```JSON  \n' + JSON.stringify(this.config.params).replace(/,/g, '\n,') + '\n```' + notes
     }).then(result => {
-        self.runtimeData.PR = result
+        self.runtimeData.PR = result.data;
         self.controllerCallback('createPR', true, result);
     }).catch(err => {
             self.controllerCallback('createPR', false, err);
@@ -760,6 +762,8 @@ Worker.prototype.configureBranchProtection = function () {
             params.branch = branchConfig.name
         proms.push(this.github.repos.updateBranchProtection(params));
     }
+    //There's a lonstanding bug in the node REST API, the enforce_admins param is missing from the request.  It's required by GitHub
+    //Allegely addressed in a PR (https://github.com/octokit/rest.js/pull/537) the bug is apparently unresolved
     Promise.all(proms)
           .then(result => {
           self.controllerCallback('configureBranchProtection', true, result);
@@ -787,8 +791,8 @@ Worker.prototype.createPRComment = function (result) {
         body: 'Your repo-template jobID: ' + this.ID + '.\r\n' + commentText
                 + (this.runtimeData.repository ? '\r\nClick [here](' + this.runtimeData.repository.html_url + ') to visit your new repository.\r\n\r\ncc: /@' + this.config.params.newRepoRequester : '')
     }).then(comment => {
-        self.controllerCallback('createPRComment', true, comment);
+       self.controllerCallback('createPRComment', true, comment);
     }).catch(err => {
-       self.controllerCallback('createPRComment', false, err);
+        self.controllerCallback('createPRComment', false, err);
     });
 };

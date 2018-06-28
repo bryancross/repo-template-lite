@@ -97,7 +97,7 @@ function generatePRs() {
     var jobIDs = [];
 
     httpOptions.method = 'POST';
-    httpOptions.path = '/createRepo';
+    httpOptions.path = '/requestRepo';
     var numResponses = 0;
 
     for (var i = 0; i < config.numRepos; i++)

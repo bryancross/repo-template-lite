@@ -22,6 +22,7 @@
   },
   "homepage": "https://github.com/bryancross/repo-template#readme",
   "dependencies": {
+    "@octokit/rest": "^15.9.3",
     "bluebird": "^3.4.7",
     "date-fns": "^1.24.0",
     "deep-diff": "latest",

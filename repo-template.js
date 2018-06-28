@@ -7,7 +7,7 @@
 'use strict';
 const fs = require('fs');
 const http = require('http');
-const GitHubClient = require('github'); // https://github.com/mikedeboer/node-github
+const GitHubClient = require('@octokit/rest'); // https://github.com/mikedeboer/node-github
 const HttpDispatcher = require('httpdispatcher');
 const HashMap = require('hashmap');
 const Worker = require('./worker.js');
@@ -52,7 +52,7 @@ RepoTemplate.prototype.initHTTPServer = function(){
 	let self = this;
 	this.dispatcher = new HttpDispatcher();
 	this.dispatcher.onPost('/pullrequest', this.handlePullRequest);
-	this.dispatcher.onPost('/createRepo', this.handleCreateRepo);
+	this.dispatcher.onPost('/requestRepo', this.handleRequestRepo);
 	this.dispatcher.onGet('/status', this.handleStatus);
 	this.dispatcher.onPost('/stop',this.handleStop);
 	this.dispatcher.onGet('/suspend', this.handleSuspend);
@@ -250,7 +250,7 @@ RepoTemplate.prototype.initGitHubClient = function(){
 
 };
 
-RepoTemplate.prototype.handleCreateRepo = function (req, res) {
+RepoTemplate.prototype.handleRequestRepo = function (req, res) {
 
     //God this is a hack-a-saurus rex.  But how else to get a reference to the calling object?
     //Interestingly, if we try to assign this to self it complains on startup that self is already defined.
@@ -373,7 +373,7 @@ RepoTemplate.prototype.handlePullRequest = function (req, res) {
 
     });
 	that.workers.set(worker.getID(), worker);
-	worker.createRepositoryRequestPR();
+	worker.createRepository();
 };
 
 // GET /status
@@ -420,16 +420,16 @@ RepoTemplate.prototype.loadRepoConfigs = function (req) {
 		path: self.config.global.TemplateSourcePath,
 		ref: self.config.global.TemplateSourceBranch
 	}).then(result => {
-		for (let i = 0; i < result.length; i++) {
+		for (let i = 0; i < result.data.length; i++) {
 
 			self.GHClient.repos.getContent({
 				owner: self.config.global.TemplateSourceRepo.split('/')[0],
 				repo: self.config.global.TemplateSourceRepo.split('/').pop(),
-				path: result[i].path,
+				path: result.data[i].path,
 				ref: self.config.global.TemplateSourceBranch
 				}).then(result => {
 					const B64 = require('js-base64/base64.js').Base64;
-					const config = JSON.parse(B64.decode(result.content));
+					const config = JSON.parse(B64.decode(result.data.content));
 					self.config.repoConfigs.set(config.configName, config);
 
 				}).catch(err => {

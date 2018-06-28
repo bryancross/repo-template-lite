@@ -9,7 +9,7 @@ echo "Patching node-github API"
 clear
 echo "****************************************************************"
 echo
-echo "Remember to edit config/config.json"
+echo "Remember to edit config/config-example.json"
 echo "and ensure the values make sense for your environment"
 echo
 echo "****************************************************************"
