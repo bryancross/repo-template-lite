@@ -10,13 +10,10 @@
     "commitMsg": "committed by repo-template",
     "callbackURL": "https://c197aff2.ngrok.io/",
     "userAgent": "repo-template",
-    "callback": "",
-    "jobsLimit": 1000,
     "githubAPIDebug": false,
     "repoRequestHost": "octodemo.com",
     "repoRequestRepo": "rebelware/repoRequests",
     "repoRequestBranch": "master",
-    "repoRequestPath": "/requests",
     "repoRequestPRLabels": [
       "Repo Request"
     ],
