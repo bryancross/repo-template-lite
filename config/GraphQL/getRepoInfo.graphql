@@ -1,0 +1,56 @@
+query getExistingRepoBranches($orgName: String!, $repoName: String!) {
+    organization(login: $orgName) {
+
+        repository(name: $repoName) {
+            id
+            name
+            hasIssuesEnabled
+            hasWikiEnabled
+            rebaseMergeAllowed
+            squashMergeAllowed
+            resourcePath
+            licenseInfo {
+                id
+                name
+            }
+            labels(first:100) {
+                nodes{
+                    color
+                    name
+                }
+            }
+            collaborators(first:100){
+
+                edges{
+                    node {
+                        name
+                    }
+                    permission
+                }
+            }
+            protectedBranches(first:100) {
+                edges {
+                    node {
+                        id
+                        name
+                        hasRequiredReviews
+                        hasRestrictedPushes
+                        hasRequiredStatusChecks
+                        hasDismissableStaleReviews
+                        hasRestrictedReviewDismissals
+                        hasStrictRequiredStatusChecks
+                        pushAllowances(first:100) {
+                            edges {
+                                node {
+                                    id
+                                }
+                            }
+                        }
+                        isAdminEnforced
+                        requiredStatusCheckContexts
+                    }
+                }
+            }
+        }
+    }
+}

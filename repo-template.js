@@ -14,6 +14,7 @@ const Worker = require('./worker.js');
 const JSComp = require('./lib/json-compare.js');
 const uNameTest = require('github-username-regex');
 const PORT = process.env.PORT || 3000;
+ const Repo = require('./lib/repository.js');
 var events = require('events');
 
 
@@ -58,6 +59,8 @@ RepoTemplate.prototype.initHTTPServer = function(){
 	this.dispatcher.onGet('/suspend', this.handleSuspend);
 	this.dispatcher.onGet('/resume',this.handleResume);
 	this.dispatcher.onPost('/init',this.handleInit);
+	this.dispatcher.onGet('/callback',this.handleCallback);
+	this.dispatcher.onGet('/repo',this.handleRepo);
 	this.server = http.createServer((request, response) => {
 			try {
                 request.rt = self;
@@ -128,6 +131,39 @@ RepoTemplate.prototype.initHTTPServer = function(){
 	});
 };
 
+RepoTemplate.prototype.handleRepo = function(req,res) {
+	var repo = new Repo(req.headers.auth, req.params.repoOwner, req.params.repoName);
+	repo.getTeamAccessInfo();
+};
+
+RepoTemplate.prototype.handleCallback = function(req,res) {
+
+	res.respond(201,'its all good','json');
+		return;
+        var query = url.parse(req.url, true).query;
+        if (query.state == GitHubConfig.state){
+            payload = {
+                'code':       	query.code,
+                'client_id':     	GitHubConfig.client_id,
+                'client_secret': 	GitHubConfig.secret
+            }
+            console.log(payload);
+            request.post({
+                    url: 'https://github.com/login/oauth/access_token',
+                    formData: payload,
+                    headers: {'Accept': 'application/json'}
+                }, function (error, response, body) {
+                    if (!error && response.statusCode == 200) {
+                        var token = JSON.parse(body).access_token;
+                        res.statusCode = 302;
+                        authorized(res, token);
+                    }
+                }
+            );
+
+        };
+};
+
 RepoTemplate.prototype.handleInit = function(req,res)
 {
 
@@ -166,6 +202,7 @@ RepoTemplate.prototype.handleInit = function(req,res)
         req.rt.loadRepoConfigs(req);
         msg = "GitHub client initialization successful";
         res.respond(202, msg, "Client initialized");
+
 	}
 	catch(err)
 	{
@@ -229,23 +266,45 @@ RepoTemplate.prototype.initGitHubClient = function(){
 		headers: {'user-agent': this.config.global.userAgent}
 	});
 
+/*
+	 this.GHClient.authenticate({
+	 type: this.config.global.authType,
+	 token: this.config.GitHubPAT
+	 });
+	 */
+
+
+	var authParams = {}
 	// Authenticate using configured credentials
-	this.GHClient.authenticate({
-		type: this.config.global.authType,
-		token: this.config.GitHubPAT
-	});
+	if(this.config.global.authType == 'token') {
+        authParams.type = 'oauth';
+        authParams.token = this.config.GitHubPAT
+    } else if(this.config.global.authType == 'oauth') {
+        authParams.type = "oauth";
+        authParams.key = '';
+        authParams.secret = '';
+        authParams.scopes = ['repo'];
+        authParams.note ='Testing...';
+        authParams.note_url ='https://github.com/myorg/example';
+    }
+
+    this.GHClient.authenticate(authParams);
+
 
 	// Validate connection by retrieving current user info
-	this.GHClient.users.get(
+    // Validate connection by retrieving current user info
+    this.GHClient.users.get(
         {
-        //No Parameters
+            //No Parameters
         }).then(function(result)
-			{
+    {
+		console.log("Yay");
+    }).catch(function(err)
+    {
+        console.log("boo");
+        self.config.GitHubPAT = "";
+    });
 
-		}).catch(function(err)
-	{
-		throw new Error("GitHub Authentication error: " + err.message);
-	});
 
 
 };
