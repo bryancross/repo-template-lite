@@ -132,7 +132,7 @@ RepoTemplate.prototype.initHTTPServer = function(){
 };
 
 RepoTemplate.prototype.handleRepo = function(req,res) {
-	var repo = new Repo(req.headers.auth, req.params.repoOwner, req.params.repoName);
+	var repo = new Repo(req.headers.auth, req.params.repoOwner, req.params.repoName,res);
 	repo.getRepoConfig();
 };
 
