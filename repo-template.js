@@ -14,7 +14,7 @@ const Worker = require('./worker.js');
 const JSComp = require('./lib/json-compare.js');
 const uNameTest = require('github-username-regex');
 const PORT = process.env.PORT || 3000;
- const Repo = require('./lib/repository.js');
+const Repo = require('./lib/repository.js');
 var events = require('events');
 
 
@@ -133,7 +133,7 @@ RepoTemplate.prototype.initHTTPServer = function(){
 
 RepoTemplate.prototype.handleRepo = function(req,res) {
 	var repo = new Repo(req.headers.auth, req.params.repoOwner, req.params.repoName);
-	repo.getTeamAccessInfo();
+	repo.getRepoConfig();
 };
 
 RepoTemplate.prototype.handleCallback = function(req,res) {
