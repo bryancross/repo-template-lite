@@ -184,8 +184,6 @@ Worker.prototype.validateUser = function(username){
     });
 };
 
-
-
 Worker.prototype.validateUserInOrg = function(username, orgname)
 {
     let self = this;
@@ -463,7 +461,7 @@ Worker.prototype.createRepository = function () {
 Worker.prototype.getTeamsForOrg = function () {
     var self = this;
     const proms = [];
-    proms.push(this.github.orgs.getTeams({org: this.config.params.newRepoOwner}));
+    proms.push(this.github.orgs.getTeamsAndUsers({org: this.config.params.newRepoOwner}));
     this.runtimeData.orgTeams = new HashMap();
     Promise.all(proms)
         .then(result => {

@@ -16,6 +16,7 @@ const uNameTest = require('github-username-regex');
 const PORT = process.env.PORT || 3000;
 const Repo = require('./lib/repository.js');
 var events = require('events');
+const me = this;
 
 
 module.exports = RepoTemplate;
@@ -50,7 +51,7 @@ RepoTemplate.prototype.init = function () {
 };
 
 RepoTemplate.prototype.initHTTPServer = function(){
-	let self = this;
+	let that = this;
 	this.dispatcher = new HttpDispatcher();
 	this.dispatcher.onPost('/pullrequest', this.handlePullRequest);
 	this.dispatcher.onPost('/requestRepo', this.handleRequestRepo);
@@ -61,49 +62,29 @@ RepoTemplate.prototype.initHTTPServer = function(){
 	this.dispatcher.onPost('/init',this.handleInit);
 	this.dispatcher.onGet('/callback',this.handleCallback);
 	this.dispatcher.onGet('/repo',this.handleRepo);
+	this.dispatcher.onPost('/repo', this.createRepo);
 	this.server = http.createServer((request, response) => {
 			try {
-                request.rt = self;
-				response.respond = function(status, msg, format, err) {
-                    if (typeof format == 'undefined') //default is JSON
-                    {
-                        try {
-                            JSON.parse(msg);
-                            format = 'json'
-                        }
-                        catch(err)
-						{
-							msg = {message: msg};
-							format = 'json'
-						}
+                //Given the crazy variable scoping that's going on with dynamic callbacks inside of httpdispatcher
+				//I can't think of a better way to pass this instance of RepoTemplate in to the handler methods.
+				request.rt = that;
+				response.respond = function(status, msg, err) {
+                    var respText = {};
+                    respText.msg = msg;
+					if (typeof err != 'undefined' && err.hasOwnProperty('message')) {
+						respText.error = err.message;
                     }
-					if (format == 'json')
-					{
-						format = 'application/json';
-					}
-					else if (format == 'html')
-					{
-						format = 'text/html';
-					}
-					else
-					{
-						format = 'text/plain';
-					}
-
-
-                    if (typeof err != 'undefined') {
-                        this.error = err;
-                    }
-                    this.writeHead(status, {'Content-Type': format});
-                    this.end((format === 'application/json' ? JSON.stringify(msg) : msg));
+                    this.writeHead(status, {'Content-Type': 'application/json'});
+                    this.end(JSON.stringify(respText));
                 	};
 
 				// Dispatch
-					if (self.suspended
+					if (that.suspended
 						&& request.url !== '/resume'
 						&& request.url !== '/init'
 						)
 					{
+
 						response.respond(503, this.getStatusMessage());
 
 						return;
@@ -113,7 +94,7 @@ RepoTemplate.prototype.initHTTPServer = function(){
 					if (err.message === 'SHUTDOWN')			{
 						throw err;
 						}
-        		response.respond(503, "Error dispatching HTTP request",err.message);
+						response.respond(503, "Error dispatching HTTP request",err);
 				}
 		});
 
@@ -132,13 +113,18 @@ RepoTemplate.prototype.initHTTPServer = function(){
 };
 
 RepoTemplate.prototype.handleRepo = function(req,res) {
-	var repo = new Repo(req.headers.auth, req.params.repoOwner, req.params.repoName,res);
-	repo.getRepoConfig();
+	var repo = new Repo(req.headers.authorization,res);
+	repo.getRepoConfig(req.params.repoOwner, req.params.repoName);
+};
+
+RepoTemplate.prototype.createRepo = function() {
+	var body = JSON.parse(req.body);
+	this.github.repos.create
 };
 
 RepoTemplate.prototype.handleCallback = function(req,res) {
 
-	res.respond(201,'its all good','json');
+	res.respond(201,'its all good');
 		return;
         var query = url.parse(req.url, true).query;
         if (query.state == GitHubConfig.state){
@@ -175,7 +161,7 @@ RepoTemplate.prototype.handleInit = function(req,res)
 
     if (typeof PAT == 'undefined' || !regex.test(PAT))
     {
-    	res.respond(401, "Authentication failed: Missing or invalid PAT", "Missing or invalid PAT");
+    	res.respond(401, "Authentication failed: Missing or invalid PAT");
         return;
     }
 
@@ -190,7 +176,7 @@ RepoTemplate.prototype.handleInit = function(req,res)
 	}
 	catch(err)
 	{
-        res.respond(401, "Invalid or missing config", "Could not parse config");
+        res.respond(401, "Invalid or missing config");
         return;
 	}
 
@@ -201,13 +187,13 @@ RepoTemplate.prototype.handleInit = function(req,res)
         req.rt.suspended = false;
         req.rt.loadRepoConfigs(req);
         msg = "GitHub client initialization successful";
-        res.respond(202, msg, "Client initialized");
+        res.respond(202, msg);
 
 	}
 	catch(err)
 	{
 		msg = "Error initializing GitHub client: " + err.message
-        res.respond(501, msg, "Error initializing client");
+        res.respond(501, msg, err);
     }
 };
 
@@ -215,14 +201,14 @@ RepoTemplate.prototype.handleSuspend = function(req, res)
 {
 	let that = req.rt;
 	that.suspended = true;
-    res.respond(200,{message: 'Server SUSPEND received.  Server is suspended.'},'json');
+    res.respond(200,{message: 'Server SUSPEND received.  Server is suspended.'});
 };
 
 RepoTemplate.prototype.handleResume = function(req, res)
 {
     let that = req.rt
 	that.suspended = false;
-    res.respond(200,{message: 'Server RESUME received.  Server is resumed.'},'json');
+    res.respond(200,{message: 'Server RESUME received.  Server is resumed.'});
 
 };
 
@@ -256,7 +242,7 @@ RepoTemplate.prototype.getStatusMessage = function(){
 }
 
 // Initiate, authenticate, and validate the GitHub Client
-RepoTemplate.prototype.initGitHubClient = function(){
+RepoTemplate.prototype.initGitHubClient = async function(){
 	var self = this;
 	this.GHClient = new GitHubClient({
 		debug: this.config.global.githubAPIDebug,
@@ -292,24 +278,20 @@ RepoTemplate.prototype.initGitHubClient = function(){
 
 
 	// Validate connection by retrieving current user info
-    // Validate connection by retrieving current user info
-    this.GHClient.users.get(
-        {
-            //No Parameters
-        }).then(function(result)
-    {
-		console.log("Yay");
-    }).catch(function(err)
-    {
-        console.log("boo");
-        self.config.GitHubPAT = "";
-    });
+    var userData;
 
-
+    try {
+        userData = await this.GHClient.users.get();
+        return true;
+	}
+	catch(err)
+	{
+		throw new Error("Error authenticating to GitHub: " + err.message);
+	}
 
 };
 
-RepoTemplate.prototype.handleRequestRepo = function (req, res) {
+RepoTemplate.prototype.handleRequestRepo = async function (req, res) {
 
     //God this is a hack-a-saurus rex.  But how else to get a reference to the calling object?
     //Interestingly, if we try to assign this to self it complains on startup that self is already defined.
@@ -321,14 +303,14 @@ RepoTemplate.prototype.handleRequestRepo = function (req, res) {
 	}
 	catch(err)
 	{
-        res.respond(400, {message: 'JSON request does not conform to template',detail: req.body})
+        res.respond(400, 'JSON request does not conform to template');
 		return;
 	}
 
     // Validate that the request JSON is properly formed
 	const diffs = JSComp.compareJSON(reqJSON, JSON.parse(fs.readFileSync('./config/repo_requests/request-default-example.json')));
 	if (diffs) {
-		res.respond(400, {message: 'JSON request does not conform to template', detail: diffs})
+		res.respond(400,'JSON request does not conform to template' + JSON.stringify(diffs));
 		return;
 	}
 	var validationErrors = [];
@@ -351,10 +333,12 @@ RepoTemplate.prototype.handleRequestRepo = function (req, res) {
 
 	if(validationErrors.length > 0)
 	{
-        res.respond(400, {message: 'One or more request parameters are invalid', detail: validationErrors})
+        res.respond(400, 'One or more request parameters are invalid', new Error(JSON.stringify(diffs)));
         return;
 	}
+
 	let worker;
+
 	try {
 		worker = new Worker(reqJSON, that.cloneGlobalConfig());
 		worker.events.on('worker.event',function(msg){
@@ -368,7 +352,7 @@ RepoTemplate.prototype.handleRequestRepo = function (req, res) {
 	} catch (err) {
 		if(err.message && err.message == "OAuth2 authentication requires a token or key & secret to be set")
 		{
-			res.respond(500,{message: 'Could not create server object.  Authentication not set',error: err.message})
+			res.respond(500,'Could not create server object.  Authentication not set',err);
 			return
 		}
 
@@ -376,10 +360,10 @@ RepoTemplate.prototype.handleRequestRepo = function (req, res) {
             message: 'Could not create server object',
             error: err.message
         };
-		res.respond(500,msg,err.message);
+		res.respond(500,msg,err);
 		return;
 	}
-	res.respond(201,{jobID: worker.getID()})
+	res.respond(201,JSON.stringify({jobID: worker.getID()}));
 	worker.createPullRequest();
 };
 
@@ -455,7 +439,7 @@ RepoTemplate.prototype.handleStatus = function (req, res, self) {
 
     // If no query parameters, return the state of the server
 	if (!URL.parse(req.url).query) {
-		res.respond(200, {serverState: that.getStatusMessage()});
+		res.respond(200, that.getStatusMessage());
 		return;
 	}
 };
@@ -463,8 +447,52 @@ RepoTemplate.prototype.handleStatus = function (req, res, self) {
 
 RepoTemplate.prototype.handleLoadRepoConfigs = function(req,res)
 {
-    res.respond(202, {message: "Load repo configs request received"},'json');
+    res.respond(202, "Load repo configs request received");
 	req.rt.loadRepoConfigs(req);
+};
+
+RepoTemplate.prototype.asyncLoadRepoConfigs = async function (req) {
+	let self = req.rt;
+	var repoConfigs = [];
+	var repoConfig;
+
+	self.config.repoConfigs = new HashMap();
+	try {
+        repoConfigs = await self.GHClient.repos.getContent({
+            owner: self.config.global.TemplateSourceRepo.split('/')[0],
+            repo: self.config.global.TemplateSourceRepo.split('/').pop(),
+            path: self.config.global.TemplateSourcePath,
+            ref: self.config.global.TemplateSourceBranch
+        });
+
+		for(var i = 0; i < repoConfigs.length; i++)
+		{
+			repoConfig = await self.GHClient.repos.getContent({
+                owner: self.config.global.TemplateSourceRepo.split('/')[0],
+                repo: self.config.global.TemplateSourceRepo.split('/').pop(),
+                path: repoConfigs.data[i].path,
+                ref: self.config.global.TemplateSourceBranch
+			});
+            const B64 = require('js-base64/base64.js').Base64;
+            const config = JSON.parse(B64.decode(repoConfig.data.content));
+            self.config.repoConfigs.set(config.configName, config);
+		}
+	}
+	catch(err)
+	{
+        if (err.message == 'Bad credentials'
+        )
+        {
+
+        }
+        else
+        {
+
+            self.shutdown();
+        }
+	}
+
+
 };
 
 
